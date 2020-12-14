@@ -1,0 +1,5 @@
+.ionide/
+obj/
+.DS_Store
+others/
+bin/
