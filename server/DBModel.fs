@@ -4,17 +4,11 @@ open System
 open System.Collections.Generic
 
 
-type ReplyData = {
-    ReqType: string
-    State: string
-    Data: string list
-    AllTweets: string list
-}
 
 type UserDetail = {
     Username : string
-    PublicKey : string option
-    Deleted: boolean
+    PublicKey : string
+    Deleted: bool
 }
 
 type TweetDetail = {
@@ -24,12 +18,25 @@ type TweetDetail = {
     Content : string
     Hashtag : string
     Mention : string
-    RetweetFrom : string option
+    RetweetFrom : string
 }
 
 type ReqDetail = {
     reqType: string
     data: string list
+}
+
+type ReplyDataWithTweet = {
+    ReqType: string
+    State: string
+    Data: string list
+    AllTweets: TweetDetail list 
+}
+
+type ReplyData = {
+    ReqType: string
+    State: string
+    Data: string list
 }
 
 // type TweetReply = {
@@ -80,16 +87,16 @@ let mutable usersDict = new Dictionary<string, UserDetail>()
 let mutable tweetsDict = new Dictionary<string, TweetDetail>()
 
 // key: username, value: [tweetID]
-let mutable userTweetDict = new Dictionary<string, List<string>>()
+let mutable userTweetDict = new Dictionary<string, string list>()
 
 // key: hashtag, value: [tweetID]
-let mutable hashtagsDict = new Dictionary<string, List<string>>()  
+let mutable hashtagsDict = new Dictionary<string, string list>()  
 
 // key: mentioned_username, value: [tweetID that mentioned this user]        
-let mutable mentionsDict = new Dictionary<string, List<string>>()  
+let mutable mentionsDict = new Dictionary<string, string list>()  
 
 // key: username, value: [following_username]        
-let mutable followingsDict = new Dictionary<string, List<string>>()   
+let mutable followingsDict = new Dictionary<string, string list>()   
 
 // key: username, value: [followers_username]
-let mutable followersDict = new Dictionary<string, List<string>>()   
+let mutable followersDict = new Dictionary<string, string list>()   
