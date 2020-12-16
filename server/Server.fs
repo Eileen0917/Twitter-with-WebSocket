@@ -136,18 +136,18 @@ let serverActorNode (serverMailbox:Actor<ActorMsg>) =
             let data = Json.deserialize<ReqDetail> x
             let mutable returnMsg = "400 Bad Request"
             let username = data.data.[0]
+            let retweetID = data.data.[1]
+            let retweetFrom = tweetsDict.[retweetID].Username
             let tweetID = string(tweetsDict.Count + 1)
-            let tag = data.data.[2]
-            let mentioned = data.data.[3]
-            let retweetFrom = tweetsDict.[data.data.[5]].Username
-            let tweetContent = "Retweet from " + retweetFrom + ": " + data.data.[1]
-            
+            let tag = tweetsDict.[retweetID].Hashtag
+            let mentioned = tweetsDict.[retweetID].Mention
+            let tweetContent = "Retweet from " + retweetFrom + ": " + tweetsDict.[retweetID].Content
 
             // get proper data to re-tweet
             let reqData: TweetDetail = {
                 Username = username
                 TweetID = tweetID
-                Time = System.DateTime.Parse data.data.[4]
+                Time = System.DateTime.Parse data.data.[2]
                 Content = tweetContent
                 Hashtag = tag
                 Mention = mentioned
@@ -249,7 +249,7 @@ let serverActorNode (serverMailbox:Actor<ActorMsg>) =
             let mutable returnMsg = "400 Bad Request"
             let mutable returnTweets = List.empty<TweetDetail>
             let mentionedUser = data.data.[0]
-            
+
             if mentionsDict.ContainsKey(mentionedUser) then
                 let tweetsList = mentionsDict.[mentionedUser]
                 for t in tweetsList do
@@ -275,14 +275,15 @@ let serverActorNode (serverMailbox:Actor<ActorMsg>) =
             let mutable returnTweets = List.empty<TweetDetail>
             let username = data.data.[0]
             let mutable followingList = List.empty<string>
+            let mutable oneFollowing = username
 
             if isValidUser username && followingsDict.ContainsKey(username) then
                 followingList <- followingsDict.[username]
-            let oneFollowing = followingList.[Random().Next(followingList.Length)]
-            if isValidUser oneFollowing && userTweetDict.ContainsKey(oneFollowing) then
-                for t in userTweetDict.[oneFollowing] do
-                    returnTweets <- returnTweets @ [tweetsDict.[t]]
-                    returnMsg <- "200 OK"
+                oneFollowing <- followingList.[Random().Next(followingList.Length)]
+                if isValidUser oneFollowing && userTweetDict.ContainsKey(oneFollowing) then
+                    for t in userTweetDict.[oneFollowing] do
+                        returnTweets <- returnTweets @ [tweetsDict.[t]]
+                        returnMsg <- "200 OK"
             else
                 returnMsg <- "404 Not Found"
 
@@ -339,15 +340,15 @@ let serverActorNode (serverMailbox:Actor<ActorMsg>) =
             let data = Json.deserialize<ReqDetail> x
             let mutable returnMsg = "400 Bad Request"
             let username = data.data.[0]
-
-            // get proper data to delete user
-            let reqData: UserDetail = {
-                Username = username
-                PublicKey = data.data.[1]
-                Deleted = true
-            }
-
+            
             if isValidUser username then
+                let pubK = usersDict.[username].PublicKey
+                // get proper data to delete user
+                let reqData: UserDetail = {
+                    Username = username
+                    PublicKey = pubK
+                    Deleted = true
+                }
                 usersDict.[username] <- reqData
                 returnMsg <- "200 OK"
             else

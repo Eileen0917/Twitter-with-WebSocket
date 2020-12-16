@@ -5,9 +5,32 @@ open Akka.Actor
 open Akka.FSharp
 open FSharp.Json
 
+type TweetDetail = {
+    Username : string
+    TweetID : string
+    Time : DateTime
+    Content : string
+    Hashtag : string
+    Mention : string
+    RetweetFrom : string
+}
+
 type ReqDetail = {
     reqType: string
     data: string list
+}
+
+type ResDetail = {
+    reqType: string
+    state: string
+    data: string list
+}
+
+type ResDetailWithTweets = {
+    reqType: string
+    state: string
+    data: string list
+    allTweets: TweetDetail list 
 }
 
 type UserModeStatusCheck =
@@ -27,47 +50,172 @@ let findTag (content: string) =
 
 let findMentioned (content: string) =
     let words = content.Split [|' '|]
-    let n = words.Length
     let mutable returnWord = ""
     for w in words do
         if w.[0] = '@' then
-            returnWord <- w.[n..]
+            returnWord <- w.[1..]
     returnWord
 
 let system = ActorSystem.Create("FSharp")
           
 let registed = fun (arg:MessageEventArgs) ->
-    printfn "registed %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    if state = "200 OK" then
+        isUserModeLoginSuccess <- Success
+        let regJSON: ReqDetail = { 
+            reqType = "Reconnect" ; 
+            data = [username]
+        }
+        let reqData = Json.serialize regJSON
+
+        let client = select ("akka://FSharp/user/" + username) system
+        client <! reqData
+    else
+        isUserModeLoginSuccess <- Fail
 
 let tweeted = fun (arg:MessageEventArgs) ->
-    printfn "tweeted %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let tweetContent = info.data.[1]
+    if state = "200 OK" then
+        printfn "%A tweeted: %A" username tweetContent
+    else
+        printfn "%A Not Found" username
 
 let retweeted = fun (arg:MessageEventArgs) ->
-    printfn "retweeted %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = string(info.data.[0])
+    let reTweetContent = string(info.data.[1])
+    let reTweetFrom = string(info.data.[2])
+
+    if state = "200 OK" then
+        printfn "\n%A retweeted: %A from %A" username reTweetContent reTweetFrom
+    else
+        printfn "%A Not Found" username
 
 let subscribed = fun (arg:MessageEventArgs) ->
-    printfn "subscribed %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let follow = info.data.[1]
+
+    if state = "200 OK" then
+        printfn "\n%A subscribed to %A " username follow
+    else
+        printfn "%A Not Found" username
 
 let queriedTags = fun (arg:MessageEventArgs) ->
-    printfn "queriedTags %A" (arg.Data)
+    let info = Json.deserialize<ResDetailWithTweets> arg.Data
+    let state = info.state
+    let randomHashTag = info.data.[0]
+    let allTweets = info.allTweets
+
+    if state = "200 OK" then
+        printfn "\n================================================" 
+        printfn "Tweets with %A" randomHashTag
+        for l in allTweets do 
+            printfn "\n------------------------------------"
+            printfn "TweetID: %A      Time: %A" (l.TweetID) (string(l.Time))
+            printfn "Author: %A" (l.Username)
+            printfn "Content: %A" (l.Content)
+        printfn "================================================\n"
+    else
+        printfn "[Client] %A Not Found" randomHashTag
 
 let queriedMentioned = fun (arg:MessageEventArgs) ->
-    printfn "queriedMentioned %A" (arg.Data)
+    let info = Json.deserialize<ResDetailWithTweets> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let allTweets = info.allTweets
+
+    if state = "200 OK" then
+        printfn "\n================================================" 
+        printfn "Tweets mentioned %A" username
+        for l in allTweets do 
+            printfn "\n------------------------------------"
+            printfn "TweetID: %A      Time: %A" (l.TweetID) (string(l.Time))
+            printfn "Author: %A" (l.Username)
+            printfn "Content: %A" (l.Content)
+        printfn "================================================\n"
+    else
+        printfn "[Client] %A Not Found" username
 
 let gotAllTweetFromSub = fun (arg:MessageEventArgs) ->
-    printfn "gotAllTweetFromSub %A" (arg.Data)
+    let info = Json.deserialize<ResDetailWithTweets> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let oneFollowing = info.data.[1]
+    let allTweets = info.allTweets
+    if state = "200 OK" then
+        printfn "\n================================================" 
+        printfn "One of %A's subscriber: %A's tweets" username oneFollowing
+        for l in allTweets do 
+            printfn "\n------------------------------------"
+            printfn "TweetID: %A      Time: %A" (l.TweetID) (string(l.Time))
+            printfn "Author: %A" (l.Username)
+            printfn "Content: %A" (l.Content)
+        printfn "================================================\n"
+    else
+        printfn "%A have no following." username
 
 let reconnected = fun (arg:MessageEventArgs) ->
-    printfn "reconnected %A" (arg.Data)
+    let info = Json.deserialize<ResDetailWithTweets> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let allTweets = info.allTweets
+    if state = "200 OK" then
+        isUserModeLoginSuccess <- Success
+        printfn "\n================================================" 
+        printfn "%A 's Tweets" username
+        for l in allTweets do 
+            printfn "\n------------------------------------"
+            printfn "TweetID: %A      Time: %A" (l.TweetID) (string(l.Time))
+            printfn "Author: %A" (l.Username)
+            printfn "Content: %A" (l.Content)
+        printfn "================================================\n"
+    else
+        isUserModeLoginSuccess <- Fail
 
 let disconnected = fun (arg:MessageEventArgs) ->
-    printfn "retweeted %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    if state = "200 OK" then
+        isUserModeLoginSuccess <- Success
+    else
+        isUserModeLoginSuccess <- Fail
 
 let deleted = fun (arg:MessageEventArgs) ->
-    printfn "deleted %A" (arg.Data)
+    let info = Json.deserialize<ResDetail> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    if state = "200 OK" then
+        isUserModeLoginSuccess <- Success
+    else
+        isUserModeLoginSuccess <- Fail
 
 let gotLiveView = fun (arg:MessageEventArgs) ->
-    printfn "gotLiveView %A" (arg.Data)
+    let info = Json.deserialize<ResDetailWithTweets> arg.Data
+    let state = info.state
+    let username = info.data.[0]
+    let allTweets = info.allTweets
+    if state = "200 OK" then
+        printfn "\n================================================" 
+        printfn "%A 's All Tweets" username
+        for l in allTweets do 
+            printfn "\n------------------------------------"
+            printfn "TweetID: %A      Time: %A" (l.TweetID) (string(l.Time))
+            printfn "Author: %A" (l.Username)
+            printfn "Content: %A" (l.Content)
+        printfn "================================================\n"
+    elif state = "User is disconnected." then
+        printfn "[Client] %A is disconnected" username
+    else
+        printfn "%A have no tweet." username
 
 
 let clientActorNode (clientMailbox:Actor<_>) =
@@ -93,6 +241,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
     wsReconnect.OnMessage.Add(reconnected)
     wsDisconnect.OnMessage.Add(disconnected)
     wsGetLiveView.OnMessage.Add(gotLiveView)
+    wsDelete.OnMessage.Add(deleted)
 
     let rec loop() = actor {
         let! msg = clientMailbox.Receive()
@@ -102,7 +251,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
         match pattern with
             | "Register" ->
                 let username = info.data.[0]
-                let publicKey = info.data.[1]
+                let publicKey = "publicKey"
 
                 // get proper data send to server
                 let reqData: ReqDetail = {
@@ -115,7 +264,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsRegister.Connect() 
                     wsRegister.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsRegister.Send(json)
 
             | "Tweet" ->
                 let username = info.data.[0]
@@ -135,20 +284,17 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsTweet.Connect() 
                     wsTweet.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsTweet.Send(json)
 
             | "Retweet" ->
                 let username = info.data.[0]
-                let tweetContent = info.data.[1]
-                let reTweetID = info.data.[2]
-                let tag = findTag tweetContent
-                let mentioned = findMentioned tweetContent
+                let reTweetID = info.data.[1]
                 let time = string(DateTime.Now)
 
                 // get proper data send to server
                 let reqData: ReqDetail = {
                     reqType = "Retweet"
-                    data = [username; tweetContent; tag; mentioned; time; reTweetID]
+                    data = [username; reTweetID; time;]
                 }
                 let json = Json.serialize reqData
 
@@ -156,7 +302,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsRetweet.Connect() 
                     wsRetweet.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsRetweet.Send(json)
 
             | "AddToFollowings" ->
                 let username = info.data.[0]
@@ -173,10 +319,11 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsAddToFollowings.Connect() 
                     wsAddToFollowings.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsAddToFollowings.Send(json)
             
             | "QueryHashtag" ->
-                let tag = info.data.[0]
+                let content = info.data.[1]
+                let tag = findTag content
 
                 // get proper data send to server
                 let reqData: ReqDetail = {
@@ -189,7 +336,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsQueryHashtag.Connect() 
                     wsQueryHashtag.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsQueryHashtag.Send(json)
 
             | "QueryMentioned" ->
                 let mentionedUser = info.data.[0]
@@ -205,7 +352,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsQueryMentioned.Connect() 
                     wsQueryMentioned.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsQueryMentioned.Send(json)
             
             | "GetAllTweetsFromSubscriber" ->
                 let username = info.data.[0]
@@ -221,7 +368,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsGetAllTweetsFromSubscriber.Connect() 
                     wsGetAllTweetsFromSubscriber.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsGetAllTweetsFromSubscriber.Send(json)
 
             | "Reconnect" ->
                 let username = info.data.[0]
@@ -237,7 +384,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsReconnect.Connect() 
                     wsReconnect.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsReconnect.Send(json)
 
             | "Disconnect" ->
                 let username = info.data.[0]
@@ -253,7 +400,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsDisconnect.Connect() 
                     wsDisconnect.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsDisconnect.Send(json)
 
             | "Delete" ->
                 let username = info.data.[0]
@@ -269,7 +416,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsDelete.Connect() 
                     wsDelete.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsDelete.Send(json)
 
             | "GetLiveView" ->
                 let username = info.data.[0]
@@ -285,7 +432,7 @@ let clientActorNode (clientMailbox:Actor<_>) =
                     wsGetLiveView.Connect() 
                     wsGetLiveView.Send(json)
                 else
-                    printfn "Connection Error"
+                    wsGetLiveView.Send(json)
 
             | _ ->  failwith "Unknown Message"
             
@@ -299,7 +446,7 @@ let getUserInput (option:string) =
     match option with
     | "int" ->
         while keepPrompt do
-            printf "Enter a number: "
+            printf "(int)> "
             userInputStr <- Console.ReadLine()
             match (Int32.TryParse(userInputStr)) with
             | (true, _) -> (keepPrompt <- false)
@@ -307,24 +454,11 @@ let getUserInput (option:string) =
         userInputStr
     | "string" ->
         while keepPrompt do
-            printf "Enter a string: "
+            printf "(string)> "
             userInputStr <- Console.ReadLine()
             match userInputStr with
             | "" | "\n" | "\r" | "\r\n" | "\0" -> printfn "[Error] Invalid string"
             | _ -> (keepPrompt <- false)
-        userInputStr
-    | "YesNo" ->
-        while keepPrompt do
-            printf "Enter yes/no: "
-            userInputStr <- Console.ReadLine()
-            match userInputStr.ToLower() with
-            | "yes" | "y" -> 
-                (keepPrompt <- false) 
-                userInputStr<-"yes"
-            | "no" | "n" ->
-                (keepPrompt <- false) 
-                userInputStr<-"no"
-            | _ -> printfn "[Error] Invalid input"
         userInputStr
     | _ ->
         userInputStr  
@@ -334,25 +468,26 @@ let printBanner (printStr:string) =
     printfn "%s" printStr
     printfn "----------------------------------\n"
 
-let showPrompt option = 
+let showMenu option = 
     match option with
-    | "before" ->
+    | "1" ->
         printfn "Log In or Sign Up\n"
         printfn "1. Sign Up\t register a Twitter account"
         printfn "2. Log In\t connect to exist account"
         printfn "3. Exit\t\t terminate this program"
-    | "after" ->
+    | "2" ->
         printfn "\nYou already logged in a Client Termianl\n"
         printfn "Please choose one of the commands listed below:"
-        printfn "1. sendtweet\t Post a Tweet for current log in User"
-        printfn "2. retweet\t Retweet a Tweet"
-        printfn "3. subscribe\t Subscribe to a User"
-        printfn "4. disconnect\t Disconnect/log out the current User"
-        printfn "5. history\t Query a User's History Tweets"
-        printfn "6. tag\t\t Query Tweets with a #Tag"
-        printfn "7. mention\t Query Tweets for a mentioned User"
-        printfn "8. Qsubscribe\t Query subscribe status for a User"
-        printfn "9. exit\t\t terminate this program"
+        printfn "1. Sendtweet\t\t Post a Tweet"
+        printfn "2. Retweet\t\t Retweet a Tweet with TweetID"
+        printfn "3. Subscribe\t\t Subscribe to another User"
+        printfn "4. Query Tag\t\t Query Tweets with a #Tag"
+        printfn "5. Query Mention\t Query Tweets for a mentioned User"
+        printfn "6. Query History\t Query all your Tweets"
+        printfn "7. Get Other's Tweet \t Query the tweets of one of your following"
+        printfn "8. Disconnect\t\t Log out"
+        printfn "9. Delete\t\t Delete your account and cannot log in anymore"
+        printfn "0. Exit\t\t\t terminate this program"
     | _ ->
         ()
 
@@ -373,15 +508,11 @@ let waitForServerResponse (timeout:float) =
 
 [<EntryPoint>]
 let main argv =
-    printfn "aa"
     let mutable currUsername = "temp"
     let mutable currState = 0
 
-    (showPrompt "loginFirst")
+    (showMenu "1")
     while true do
-        printfn "qq"
-        (* First State, User have to register or connect(login) first *)
-        (* If successfully registered, *)
         while currState = 0 do
             let inputStr = Console.ReadLine()
             match inputStr with
@@ -393,22 +524,28 @@ let main argv =
                         data = [username]
                     }
                     let reqData = Json.serialize regJSON
+                    try
+                        let client = spawn system username clientActorNode
+                        client <! reqData
 
-                    let client = spawn system username clientActorNode
-                    client <! reqData
+                        waitForServerResponse (5.0)
+                        if isUserModeLoginSuccess = Success then
+                            printBanner ("Successfully registered and login as User")
+                            currState <- 1
+                            currUsername <- username
+                            (showMenu "2")
+                        else if isUserModeLoginSuccess = Fail then
+                            printBanner ("Faild to register.")
+                            (showMenu "1")
+                        else
+                            printBanner ("Timeout")
+                            (showMenu "1")
+                    with _ ->
+                        printfn "Username already used. Please try another one."
+                        isUserModeLoginSuccess <- Fail
+                        (showMenu "1")
 
-                    waitForServerResponse (5.0)
-                    if isUserModeLoginSuccess = Success then
-                        printBanner ("Successfully registered and login as User")
-                        currState <- 1
-                        currUsername <- username
-                        (showPrompt "afterLogin")
-                    else if isUserModeLoginSuccess = Fail then
-                        printBanner ("Faild to register.")
-                        (showPrompt "loginFirst")
-                    else
-                        printBanner ("Timeout")
-                        (showPrompt "loginFirst")
+                    
 
                 | "2" ->
                     printfn "Please enter your username: "
@@ -419,7 +556,7 @@ let main argv =
                     }
                     let reqData = Json.serialize regJSON
 
-                    let client = spawn system username clientActorNode
+                    let client = select ("akka://FSharp/user/" + username) system
                     client <! reqData
 
                     waitForServerResponse (5.0)
@@ -427,20 +564,20 @@ let main argv =
                         printBanner ("Successfully connected and login as User")
                         currState <- 1
                         currUsername <- username
-                        (showPrompt "afterLogin")
+                        (showMenu "2")
                     else if isUserModeLoginSuccess = Fail then
                         printBanner ("Faild to connect and login.")
-                        (showPrompt "loginFirst")
+                        (showMenu "1")
                     else
                         printBanner ("Timeout")
-                        (showPrompt "loginFirst")
+                        (showMenu "1")
 
                 | "3" ->
                     printfn "Bye!"
                     Environment.Exit 1
 
                 | _ ->
-                    (showPrompt "loginFirst")
+                    (showMenu "1")
 
         while currState = 1 do
             let inputStr = Console.ReadLine()
@@ -455,36 +592,84 @@ let main argv =
                     }
                     let reqData = Json.serialize regJSON
                     client <! reqData
-                    (showPrompt "afterLogin")
+                    (showMenu "2")
 
                 | "2"| "retweet" -> 
                     let client = select ("akka://FSharp/user/" + currUsername) system
                     printfn "Please enter the \"TweetID\" you want to retweet: "
                     printfn "You can check \"TweetID\" with other commands."
-                    let content = (getUserInput "string")
+                    let tweetID = (getUserInput "string")
                     let regJSON: ReqDetail = { 
                         reqType = "Retweet" ; 
-                        data = [currUsername;content]
+                        data = [currUsername;tweetID]
                     }
                     let reqData = Json.serialize regJSON
                     client <! reqData
 
-                    (showPrompt "afterLogin")
+                    (showMenu "2")
 
                 | "3"| "subscribe" -> 
                     let client = select ("akka://FSharp/user/" + currUsername) system
                     printfn "Please enter the \"username\" you want to follow: "
+                    let follow = (getUserInput "string")
+                    let regJSON: ReqDetail = { 
+                        reqType = "AddToFollowings" ; 
+                        data = [currUsername;follow]
+                    }
+                    let reqData = Json.serialize regJSON
+                    client <! reqData
+
+                    (showMenu "2")
+
+                | "4"| "tag" -> 
+                    let client = select ("akka://FSharp/user/" + currUsername) system
+                    printfn "Please enter the \"tag\" you want to query (with #): "
                     let content = (getUserInput "string")
                     let regJSON: ReqDetail = { 
-                        reqType = "Tweet" ; 
+                        reqType = "QueryHashtag" ; 
                         data = [currUsername;content]
                     }
                     let reqData = Json.serialize regJSON
                     client <! reqData
 
-                    (showPrompt "afterLogin")
+                    (showMenu "2")
 
-                | "4" | "disconnect" ->
+                | "5"| "mention" -> 
+                    let client = select ("akka://FSharp/user/" + currUsername) system
+                    printfn "Please enter the \"username\" you want to query (without @): "
+                    let queryUser = (getUserInput "string")
+                    let regJSON: ReqDetail = { 
+                        reqType = "QueryMentioned" ; 
+                        data = [queryUser]
+                    }
+                    let reqData = Json.serialize regJSON
+                    client <! reqData
+
+                    (showMenu "2")
+
+                | "6"| "GetAll" -> 
+                    let client = select ("akka://FSharp/user/" + currUsername) system
+                    let regJSON: ReqDetail = { 
+                        reqType = "GetLiveView" ; 
+                        data = [currUsername]
+                    }
+                    let reqData = Json.serialize regJSON
+                    client <! reqData
+
+                    (showMenu "2")
+
+                | "7"| "GetAllTweetsFromSubscriber" -> 
+                    let client = select ("akka://FSharp/user/" + currUsername) system
+                    let regJSON: ReqDetail = { 
+                        reqType = "GetAllTweetsFromSubscriber" ; 
+                        data = [currUsername]
+                    }
+                    let reqData = Json.serialize regJSON
+                    client <! reqData
+
+                    (showMenu "2")
+
+                | "8" | "disconnect" ->
                     let client = select ("akka://FSharp/user/" + currUsername) system
                     let regJSON: ReqDetail = { 
                         reqType = "Disconnect" ; 
@@ -498,54 +683,36 @@ let main argv =
                         printBanner ("Successfully diconnected and logout User")
                         currUsername <- "temp"
                         currState <- 0
-                        (showPrompt "loginFirst")
+                        (showMenu "1")
                     else
                         printBanner ("Faild to disconnect and logout.")
-                        (showPrompt "afterLogin")
-
-                | "5"| "tag" -> 
-                    let client = select ("akka://FSharp/user/" + currUsername) system
-                    printfn "Please enter the \"tag\" you want to query (with #): "
-                    let content = (getUserInput "string")
-                    let regJSON: ReqDetail = { 
-                        reqType = "QueryTag" ; 
-                        data = [currUsername;content]
-                    }
-                    let reqData = Json.serialize regJSON
-                    client <! reqData
-
-                    (showPrompt "afterLogin")
-
-                | "6"| "mention" -> 
-                    let client = select ("akka://FSharp/user/" + currUsername) system
-                    printfn "Please enter the \"username\" you want to query (without @): "
-                    let content = (getUserInput "string")
-                    let regJSON: ReqDetail = { 
-                        reqType = "QueryTag" ; 
-                        data = [currUsername;content]
-                    }
-                    let reqData = Json.serialize regJSON
-                    client <! reqData
-
-                    (showPrompt "afterLogin")
-
-                | "7"| "Qsubscribe" -> 
+                        (showMenu "2")
+                
+                | "9"| "Delete" -> 
                     let client = select ("akka://FSharp/user/" + currUsername) system
                     let regJSON: ReqDetail = { 
-                        reqType = "QueryTag" ; 
+                        reqType = "Delete" ; 
                         data = [currUsername]
                     }
                     let reqData = Json.serialize regJSON
                     client <! reqData
 
-                    (showPrompt "afterLogin")
+                    waitForServerResponse (5.0)
+                    if isUserModeLoginSuccess = Success then
+                        printBanner ("Successfully deleted and logout User")
+                        currUsername <- "temp"
+                        currState <- 0
+                        (showMenu "1")
+                    else
+                        printBanner ("Faild to delete and logout.")
+                        (showMenu "2")
 
-                | "8" | "exit" ->
+                | "0" | "exit" ->
                     printfn "Exit the program, Bye!"
                     Environment.Exit 1
 
                 | _ ->
-                    (showPrompt "afterLogin")
+                    (showMenu "2")
 
 
     0
