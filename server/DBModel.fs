@@ -27,56 +27,17 @@ type ReqDetail = {
 }
 
 type ReplyDataWithTweet = {
-    ReqType: string
-    State: string
-    Data: string list
-    AllTweets: TweetDetail list 
+    reqType: string
+    state: string
+    data: string list
+    allTweets: TweetDetail list 
 }
 
 type ReplyData = {
-    ReqType: string
-    State: string
-    Data: string list
+    reqType: string
+    state: string
+    data: string list
 }
-
-// type TweetReply = {
-//     ReqType : string
-//     Type : string
-//     Status : int
-//     TweetInfo : TweetInfo
-// }
-
-// type SubInfo = {
-//     ReqType : string
-//     UserID : int 
-//     PublisherID : int
-// }
-
-// type SubReply = {
-//     ReqType : string
-//     Type : string
-//     TargetUserID : int
-//     Subscriber : int[]
-//     Publisher : int[]
-// }
-
-// type ConnectInfo = {
-//     ReqType : string
-//     UserID : int
-// }
-
-// type QueryInfo = {
-//     ReqType : string
-//     UserID : int
-//     Tag : string
-// }
-
-// type RetweetInfo = {
-//     ReqType: string
-//     UserID : int
-//     TargetUserID : int
-//     RetweetID : string
-// }
 
 
 
