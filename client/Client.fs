@@ -152,6 +152,8 @@ let privateKeys =
 
 let publicKeys = List.map (fun (p,k) -> (p,rsa_pub k)) privateKeys
 
+//printfn "%A" List.assoc a publicKeys
+
 type TweetDetail = {
     Username : string
     TweetID : string
