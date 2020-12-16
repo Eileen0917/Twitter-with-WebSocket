@@ -23,28 +23,6 @@ let ibase64 (x:str) : bytes = bytes (System.Convert.FromBase64String (istr x))
 let utf8 (x:str) : bytes = bytes (System.Text.Encoding.UTF8.GetBytes (istr x))
 let iutf8 (x:bytes) : str = str (System.Text.Encoding.UTF8.GetString (ibytes x))
 
-//let concatfix (x:bytes) (y:bytes) : bytes = bytes (Array.append (ibytes x) (ibytes y))
-//let iconcatfix (n:int)  (x:bytes) = 
-//  let x = ibytes x in
-//  let x1 = Array.sub x 0 n in 
-//  let x2 = Array.sub x n (Array.length x - n) in 
-//    (bytes x1, bytes x2) 
-
-//let size (x:bytes) = 
-//  let l = Array.length (ibytes x) in 
-//  bytes ([| (byte) (l % 256) ; (byte) (l / 256) |])
-
-//let concatvar (x:bytes) (y:bytes) : bytes = 
-//  concatfix (size x) (concatfix x y)
-//let iconcatvar (x:bytes) = 
-//  let s,x' = iconcatfix 2 x in
-//  let s = ibytes s in
-//  let l = (int)(s.(0))+256* (int)(s.(1)) in
-//  iconcatfix l x'
-
-//let concat x y = concatvar x y
-//let iconcat z = iconcatvar z
-
 let equals (By x) (By y) = 
   if x.Length <> y.Length then false
   else 
@@ -56,8 +34,9 @@ let sha1_instance = SHA1.Create ()
 let sha1 (x:bytes) : bytes = bytes (sha1_instance.ComputeHash (ibytes x))
 
 type key = 
-    SymKey of bytes
+  | SymKey of bytes
   | AsymKey of RSACryptoServiceProvider
+  
 let symkey b = SymKey b
 let symkeyToBytes k = 
   match k with
@@ -151,8 +130,6 @@ let privateKeys =
   ]
 
 let publicKeys = List.map (fun (p,k) -> (p,rsa_pub k)) privateKeys
-
-//printfn "%A" List.assoc a publicKeys
 
 type TweetDetail = {
     Username : string
